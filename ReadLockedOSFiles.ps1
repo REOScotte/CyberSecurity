@@ -34,7 +34,7 @@ vssadmin list shadows
 
 # vssadmin 1.1 - Volume Shadow Copy Service administrative command-line tool
 # (C) Copyright 2001-2013 Microsoft Corp.
-# 
+#
 # Contents of shadow copy set ID: {48558a2c-943c-4c64-a9cf-2e3779a4ac6a}
 #    Contained 1 shadow copies at creation time: 7/16/2018 11:00:43 AM
 #       Shadow Copy ID: {cc3e05d0-2981-4f6b-90d5-a329cd5e08cf}
