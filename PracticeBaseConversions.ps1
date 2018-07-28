@@ -1,19 +1,23 @@
 <#
-Just a quick powershell game to practice converting between base 2, 10, and 16
-It gives a number in one of the 3 bases and prompts with a desired base
+    Just a quick powershell game to practice converting between base 2, 10, and 16
+    It gives a number in one of the 3 bases and prompts with a desired base
 
-Base 10 and 16 numbers are entered normally, leading zeros are ignored and there's not need for a prefix like 0x for hex.
-Base 2 however is a little weird. It basically copies the input scheme for BinaryBlitz - a game a friend of mine wrote.
-(https://gannebraemorr.wixsite.com/home, click Files to download Binary Blitz.exe)
-In that game, your fingers rest on the home row (asdfjkl;) and those characters toggle the corresponding bit.
-I like that input scheme, but it's tricky to simulate using PowerShell's Read-Host. But, this gets pretty close:
-You enter a string of those characters in any order and duplicates of the character cancel each other out.
+    Base 10 and 16 numbers are entered normally, leading zeros are ignored and there's not need for a prefix like 0x for hex.
+    Base 2 however is a little weird. It basically copies the input scheme for BinaryBlitz - a game a friend of mine wrote.
+    (https://gannebraemorr.wixsite.com/home, click Files to download Binary Blitz.exe)
+    In that game, your fingers rest on the home row (asdfjkl;) and those characters toggle the corresponding bit.
+    I like that input scheme, but it's tricky to simulate using PowerShell's Read-Host. But, this gets pretty close:
+    You enter a string of those characters in any order and duplicates of the character cancel each other out.
 
-For example, all of these evaluate to 1001 0000 (144) since the first (a) and fourth (f) bit are entered.
-af
-fa
-afaa (the extra two a's cancel each other)
+    For example, all of these evaluate to 1001 0000 (144) since the first (a) and fourth (f) bit are entered.
+    af
+    fa
+    afaa (the extra two a's cancel each other)
 #>
+
+$binColor = "Magenta"
+$decColor = "Cyan"
+$hexColor = "Yellow"
 
 $ErrorActionPreference = 'SilentlyContinue'
 $right = 0
@@ -21,7 +25,8 @@ $wrong = 0
 $start = Get-Date
 
 do {
-    Write-Host "Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))"
+    $average = ((Get-Date) - $start).TotalSeconds / ($right + $wrong)
+    Write-Host "Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds"
 
     # Get the number and bases. The -Maximum parameter is exclusive, so we'll end up with 0 - 255
     # Passing the valid bases to Get-Random lets us pick two non-colliding bases at once.
@@ -37,9 +42,9 @@ do {
 
     # Show the problem with formating that's appropriate for the different bases
     switch ($baseFrom) {
-        2 {Write-Host "Bin:" ("{0:0000 0000}" -f [int]([Convert]::ToString($number, 2)))}
-        10 {Write-Host "Dec:" ([Convert]::ToString($number, 10))}
-        16 {Write-Host "Hex:" ([Convert]::ToString($number, 16)).ToUpper()}
+        2 {Write-Host -ForegroundColor $binColor  "Bin:" ("{0:0000 0000}" -f [int]([Convert]::ToString($number, 2)))}
+        10 {Write-Host -ForegroundColor $decColor "Dec:" ([Convert]::ToString($number, 10))}
+        16 {Write-Host -ForegroundColor $hexColor "Hex:" ([Convert]::ToString($number, 16)).ToUpper()}
     }
 
     # Store the right answer for display when wrong
@@ -51,9 +56,9 @@ do {
 
     # Prompt for an answer
     $answer = switch ($baseTo) {
-        2 {Read-Host "Bin"}
-        10 {Read-Host "Dec"}
-        16 {Read-Host "Hex"}
+        2 {Write-Host -ForegroundColor $binColor "Bin: " -NoNewline; Read-Host}
+        10 {Write-Host -ForegroundColor $decColor "Dec: " -NoNewline; Read-Host}
+        16 {Write-Host -ForegroundColor $hexColor "Hex: " -NoNewline; Read-Host}
     }
 
     if ($answer -eq 'q') {break}
@@ -93,7 +98,3 @@ do {
         $wrong++
     }
 } while ($answer -ne "q")
-
-$end = Get-Date
-$average = ($end - $start).Seconds / ($right + $wrong)
-Write-Host "Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds"
