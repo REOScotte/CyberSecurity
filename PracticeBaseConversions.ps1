@@ -25,9 +25,6 @@ $wrong = 0
 $start = Get-Date
 
 do {
-    $average = ((Get-Date) - $start).TotalSeconds / ($right + $wrong)
-    Write-Host "Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds"
-
     # Get the number and bases. The -Maximum parameter is exclusive, so we'll end up with 0 - 255
     # Passing the valid bases to Get-Random lets us pick two non-colliding bases at once.
     $number = Get-Random -Maximum 256
@@ -36,15 +33,15 @@ do {
     $baseTo = $bases[1]
 
     # Uncomment to force values
-    # $number = 0
-    # $baseFrom = 10
+    # $number = 150
+    # $baseFrom = 16
     # $baseTo = 16
 
     # Show the problem with formating that's appropriate for the different bases
     switch ($baseFrom) {
         2 {Write-Host -ForegroundColor $binColor  "Bin:" ("{0:0000 0000}" -f [int]([Convert]::ToString($number, 2)))}
         10 {Write-Host -ForegroundColor $decColor "Dec:" ([Convert]::ToString($number, 10))}
-        16 {Write-Host -ForegroundColor $hexColor "Hex:" ([Convert]::ToString($number, 16)).ToUpper()}
+        16 {Write-Host -ForegroundColor $hexColor "Hex:" ('0x' + ([Convert]::ToString($number, 16)).ToUpper().PadLeft(2,'0'))}
     }
 
     # Store the right answer for display when wrong
@@ -58,7 +55,7 @@ do {
     $answer = switch ($baseTo) {
         2 {Write-Host -ForegroundColor $binColor "Bin: " -NoNewline; Read-Host}
         10 {Write-Host -ForegroundColor $decColor "Dec: " -NoNewline; Read-Host}
-        16 {Write-Host -ForegroundColor $hexColor "Hex: " -NoNewline; Read-Host}
+        16 {Write-Host -ForegroundColor $hexColor "Hex: 0x" -NoNewline; Read-Host}
     }
 
     if ($answer -eq 'q') {break}
@@ -90,11 +87,14 @@ do {
         16 {$a = [Convert]::ToInt32($answer, 16)}
     }
 
+    $average = ((Get-Date) - $start).TotalSeconds / ($right + $wrong)
+    Write-Host ""
+
     if ($a -eq $number) {
-        Write-Host "Good job" -ForegroundColor Green
+        Write-Host "Good job - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Green
         $right++
     } else {
-        Write-Host "Moron - $goal" -ForegroundColor Red
+        Write-Host "Moron - $goal - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Red
         $wrong++
     }
 } while ($answer -ne "q")
