@@ -50,37 +50,43 @@ function Invoke-RemoteTemplate {
     )
 
     begin {
-        # This script will run on all appropriate targets in the end block.
+        # The End block will run this script on all appropriate targets.
         $script = {
             Stop-Puppy -Name $Variable
         }
 
-        # The end block looks for this optional postScript to call locally after $script is finished being invoked.
+        # The End block looks for this optional postScript to call locally after $script is finished being invoked.
         $postScript = {
-
+        
         }
     }
 
-    # The process block builds a collection of targets.
+    # The process block builds a collection of targets - $allSessions and $allComputers are referenced in the End block.
     # Steps that are unique per target can be done here as well.
     process {
-        foreach ($target in $Session) {
-            [array]$allSessions += $target
-            # Do something unique to the target
-        }
-        
-        foreach ($target in $ComputerName) {
-            [array]$allComputers += $target
-            # Do something unique to the target
-        }
-
-        if (-not $Session -and -not $ComputerName) {
-            # Do something locally
+        switch ($PSCmdlet.ParameterSetName) {
+            'Session'  {
+                foreach ($target in $Session) {
+                    [array]$allSessions += $target
+                    # Do something unique to the target
+                }
+            }
+            'Computer' {
+                foreach ($target in $ComputerName) {
+                    [array]$allComputers += $target
+                    # Do something unique to the target
+                }
+            }
+            'Local'    {
+                # Do something locally
+            }
         }
     }
 
     # The end block is boilerplate and handles running $script locally or on remote computers and sessions.
-    # Generally, this should not be modified.
+    # It parses the AST of the begin block to find variables that need to be referenced remotely with $using:
+    # It also handles importing the $*Preference variables into remote sessions.
+    # Generally, this block should not be modified.
     end {
         #region Get local variables to be imported into $script
         # Parse the Ast of the current script
@@ -98,28 +104,42 @@ function Invoke-RemoteTemplate {
             param( [System.Management.Automation.Language.Ast] $AstObject )
             return ( $AstObject -is [System.Management.Automation.Language.AssignmentStatementAst] )
         }
-        $assignmentStatementAst = $beginNamedBlockAst.FindAll($predicate, $false) | Where-Object { $_.Left.Extent.Text -notin @('$script', '$postScript') }
+        [array]$assignmentStatementAst = $beginNamedBlockAst.FindAll($predicate, $false) |
+            Select-Object @{n = 'Left'; e = { $_.Left.Extent.Text.Replace('$', '')} } |
+            Where-Object Left -notin @('$script', '$postScript') |
+            Select-Object -ExpandProperty Left
 
         # Find any parameters defined in this function
+        # The string of .parent in the where predicate limits to parameters defined in this function and excludes parameters
+        # defined in other param() blocks in this function. For example, the param block in the $predicate statement below.
+        # If .parent (6 times) exists, then the parameter isn't in the main param block.
         $predicate = {
             param( [System.Management.Automation.Language.Ast] $AstObject )
             return ( $AstObject -is [System.Management.Automation.Language.ParameterAst] )
         }
-        # The string of .parent in wthe where predicate limits to parameters defined in the function and excludes parameters
-        # defined in other param() blocks in this function. For example, the param block in the $predicate statement above.
-        # If .parent (6 times) exists, then the parameter isn't in the main param block.
-        $parameterAst = $functionAst.FindAll($predicate, $true) | Where-Object { -not $_.parent.parent.parent.parent.parent.parent }
-
-        # Get the list of local variables
-        $localVariables = $parameterAst.Name.Extent.Text + $assignmentStatementAst.Left.Extent.Text
+        [array]$parameterAst = $functionAst.FindAll($predicate, $true) |
+            Where-Object { -not $_.parent.parent.parent.parent.parent.parent } |
+            Select-Object @{n = 'Name'; e = { $_.Name.Extent.Text.Replace('$', '')} } |
+            Where-Object Name -notin @('$ComputerName', '$Session') |
+            Select-Object -ExpandProperty Name
 
         # Create a script that imports each local variable from the $using scope. The $using statements are wrapped in
         # a try/catch block since the $using scope doesn't exist when the script is executed locally and would otherwise error.
-        $variableScript = 'try {`n'
-        foreach ($variable in $localVariables) {
-            $variableScript += "`t$variable = `$using:$($variable.Replace('$', ''))`n" 
+        # Ast could pick up variables that aren't always assigned so its existence is checked before adding to the block.
+        # For example, $test won't have a value if condition is false, but Ast will still see it.
+        # if ($condition) {$test = 'test'}
+        $variableScript = "`n            try {`n"
+        foreach ($localVariable in $assignmentStatementAst) {
+            if (Get-Variable | Where-Object Name -eq $localVariable) {
+                $variableScript += "                `$$localVariable = `$using:$localVariable`n" 
+            }
         }
-        $variableScript = '} catch {}`n'
+        foreach ($localVariable in $parameterAst) {
+            if (Get-Variable | Where-Object Name -EQ $localVariable) {
+                $variableScript += "                `$$localVariable = `$using:$localVariable`n" 
+            }
+        }
+        $variableScript += "            } catch {}`n"
         #endregion
 
         #region Import preference variables
@@ -156,19 +176,27 @@ function Invoke-RemoteTemplate {
 
         #region Assemble the 3 scripts and run it
         # The preference script and the actual script are combined into a single scriptblock.
-        $totalScript = [scriptblock]::Create($variableScript + $preferenceScript.ToString() + $script.ToString())
+        $totalScript = [scriptblock]::Create($preferenceScript.ToString() + $variableScript + $script.ToString())
 
         # Run the total script on all applicable targets - computers, sessions, or local.
-        if ($allSessions) {
-            Invoke-Command -Session $allSessions -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable ErrorVar
-        } elseif ($allComputers) {
-            Invoke-Command -ComputerName $allComputers -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable ErrorVar
-        } else {
-            & $totalScript
+        switch ($PSCmdlet.ParameterSetName) {
+            'Session' {
+                if ($allSessions) {
+                    Invoke-Command -Session $allSessions -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar
+                }
+            }
+            'Computer' {
+                if ($allComputers) {
+                    Invoke-Command -ComputerName $allComputers -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar
+                }
+            }
+            'Local' {
+                & $totalScript
+            }
         }
         #endregion
 
-        #region Handle any errors received in Invoke-Command.
+        #region Report any errors collected in $ErrorVar
         # If the error has an OriginInfo.PSComputerName, it occurred ON the remote computer so the remote error is written here as a warning.
         # If the error has a TargetObject.ComputerName, it occurred trying to connect to a session object so report the computer name.
         # If the error just has a TargetObject, it occured trying to connect to a remote computer, so report the computer name.
