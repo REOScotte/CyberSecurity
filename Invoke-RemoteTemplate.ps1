@@ -31,6 +31,11 @@ to support other connection options, authentication options, throttle limits, en
 Any Parameter that Invoke-Command support can be used. This paramater is splatted to all instances of Invoke-Command
 
 Note: This function uses the Session, ComputerName, ErrorAction, ErrorVariable, ToSession
+An optional set of parameters used to customize Invoke-Command to support other connection options,
+authentication options, throttle limits, end point specifications, etc.
+Any Parameter that Invoke-Command supports can be used and this paramater is splatted to all instances of Invoke-Command
+
+Note: This function uses Session, ComputerName, ErrorAction, ErrorVariable, and ToSession
 Specifying these Parameters will cause unexpected results, but should not be needed.
 
 .PARAMETER Variable
