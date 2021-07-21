@@ -3,14 +3,35 @@
 Template for a function that supports remote computers
 
 .DESCRIPTION
-Can be run locally, on a remote computer, or in an existing remote session. The script that's defined in
-the end block is what will run.
+This template simplifies building functions that will flexibly run locally or remotely.
+A script is defined once in the Begin block that implements the desired flexibility. 
+
+This function can be run locally, on a remote computer, or in an existing remote session.
+The script that's defined in the Begin block is what will run. 
+
+The Process block collects a list of targets.
+
+The End block parses the AST to ensure all variables and preferences are referenced correctly and then $script
+is invoked on all the targets.
+
+Optionally, $postScript can be defined in the End block. After the main script is finished, it will be run
+locally to handle any needed cleanup or other tasks.
+
+Parameters can be added to the param() block, but Session, ComputerName, and InvokeCommandPreferences shouldn't be changed.
 
 .PARAMETER ComputerName
 A remote computer to target
 
 .PARAMETER Session
 A PSSession object to target
+
+.PARAMETER InvokeCommandParameters
+An optional set of parameters that Invoke-Command will use. This can be used to customize Invoke-Command
+to support other connection options, authentication options, throttle limits, end point specifications, etc.
+Any Parameter that Invoke-Command support can be used. This paramater is splatted to all instances of Invoke-Command
+
+Note: This function uses the Session, ComputerName, ErrorAction, ErrorVariable, ToSession
+Specifying these Parameters will cause unexpected results, but should not be needed.
 
 .PARAMETER Variable
 An example variable
@@ -31,6 +52,11 @@ Run on Comp1 and Comp2 via pipeline session objects
 $sessions = New-PSSession -ComputerName Comp1, Comp2
 $sessions | Invoke-RemoteTemplate
 
+.EXAMPLE
+Run on Comp1 over port 8080
+
+Invoke-RemoteTemplate -InvokeCommandParameters @{Port = 8080}
+
 .NOTES
 Author: Scott Crawford
 Created: 2020-09-30
@@ -46,9 +72,12 @@ function Invoke-RemoteTemplate {
         [Alias('Name', 'Server', 'CN', 'PSComputerName')]
         [string[]]$ComputerName
         ,
+        [hashtable]$InvokeCommandParameters
+        ,
         [string]$Variable
     )
 
+    # The majority of the script is defined here. Any setup can be done here and $script and $postScript are defined.
     begin {
         # The End block will run this script on all appropriate targets.
         $script = {
@@ -61,7 +90,7 @@ function Invoke-RemoteTemplate {
         }
     }
 
-    # The process block builds a collection of targets - $allSessions and $allComputers are referenced in the End block.
+    # The process block builds a collection of targets - $allSessions and $allComputers -  which are referenced in the End block.
     # Steps that are unique per target can be done here as well.
     process {
         switch ($PSCmdlet.ParameterSetName) {
@@ -112,7 +141,7 @@ function Invoke-RemoteTemplate {
         # Find any parameters defined in this function
         # The string of .parent in the where predicate limits to parameters defined in this function and excludes parameters
         # defined in other param() blocks in this function. For example, the param block in the $predicate statement below.
-        # If .parent (6 times) exists, then the parameter isn't in the main param block.
+        # If .parent.parent.parent.parent.parent.parent exists, then the parameter isn't in the main param block.
         $predicate = {
             param( [System.Management.Automation.Language.Ast] $AstObject )
             return ( $AstObject -is [System.Management.Automation.Language.ParameterAst] )
@@ -125,12 +154,13 @@ function Invoke-RemoteTemplate {
 
         # Create a script that imports each local variable from the $using scope. The $using statements are wrapped in
         # a try/catch block since the $using scope doesn't exist when the script is executed locally and would otherwise error.
-        # Ast could pick up variables that aren't always assigned so its existence is checked before adding to the block.
+        # Ast could pick up variables that aren't always assigned, so its existence is checked before adding to the block.
         # For example, $test won't have a value if condition is false, but Ast will still see it.
         # if ($condition) {$test = 'test'}
+        # PSBoundParameters is also added to pick up DynamicParameters and to pass this info to remote machines.
         $variableScript = "`n            try {`n"
         foreach ($localVariable in $assignmentStatementAst) {
-            if (Get-Variable | Where-Object Name -eq $localVariable) {
+            if (Get-Variable | Where-Object Name -EQ $localVariable) {
                 $variableScript += "                `$$localVariable = `$using:$localVariable`n" 
             }
         }
@@ -139,6 +169,7 @@ function Invoke-RemoteTemplate {
                 $variableScript += "                `$$localVariable = `$using:$localVariable`n" 
             }
         }
+        $variableScript += "                `$PSBoundParameters = `$using:PSBoundParameters`n"
         $variableScript += "            } catch {}`n"
         #endregion
 
@@ -182,12 +213,12 @@ function Invoke-RemoteTemplate {
         switch ($PSCmdlet.ParameterSetName) {
             'Session' {
                 if ($allSessions) {
-                    Invoke-Command -Session $allSessions -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar
+                    Invoke-Command -Session $allSessions -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar @InvokeCommandParameters
                 }
             }
             'Computer' {
                 if ($allComputers) {
-                    Invoke-Command -ComputerName $allComputers -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar
+                    Invoke-Command -ComputerName $allComputers -ScriptBlock $totalScript -ErrorAction SilentlyContinue -ErrorVariable +ErrorVar @InvokeCommandParameters
                 }
             }
             'Local' {
