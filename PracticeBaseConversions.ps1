@@ -1,6 +1,6 @@
 <#
     Just a quick powershell game to practice converting between base 2, 10, and 16
-    It gives a number in one of the 3 bases and prompts with a desired base
+    It gives a number in one of the 3 bases and prompts with a desired base.
 
     Base 10 and 16 numbers are entered normally, leading zeros are ignored and there's not need for a prefix like 0x for hex.
     Base 2 however is a little weird. It basically copies the input scheme for BinaryBlitz - a game a friend of mine wrote.
@@ -15,9 +15,9 @@
     afaa (the extra two a's cancel each other)
 #>
 
-$binColor = "Magenta"
-$decColor = "Cyan"
-$hexColor = "Yellow"
+$binColor = [System.ConsoleColor]::Magenta
+$decColor = [System.ConsoleColor]::Cyan
+$hexColor = [System.ConsoleColor]::Yellow
 
 $ErrorActionPreference = 'SilentlyContinue'
 $right = 0
@@ -91,10 +91,10 @@ do {
     Write-Host ""
 
     if ($a -eq $number) {
-        Write-Host "Good job - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Green
         $right++
+        Write-Host "Good job - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Green
     } else {
-        Write-Host "Moron - $goal - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Red
         $wrong++
+        Write-Host "Moron - $goal - Right: $right`tWrong: $wrong`tPercent: $($right * 100 / ($right + $wrong))`tAverage: $average seconds" -ForegroundColor Red
     }
 } while ($answer -ne "q")
