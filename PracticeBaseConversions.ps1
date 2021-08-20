@@ -1,18 +1,18 @@
 <#
-    Just a quick powershell game to practice converting between base 2, 10, and 16
-    It gives a number in one of the 3 bases and prompts with a desired base.
+Just a quick powershell game to practice converting between base 2, 10, and 16
+It gives a number in one of the 3 bases and prompts with a desired base.
 
-    Base 10 and 16 numbers are entered normally, leading zeros are ignored and there's not need for a prefix like 0x for hex.
-    Base 2 however is a little weird. It basically copies the input scheme for BinaryBlitz - a game a friend of mine wrote.
-    (https://gannebraemorr.wixsite.com/home, click Files to download Binary Blitz.exe)
-    In that game, your fingers rest on the home row (asdfjkl;) and those characters toggle the corresponding bit.
-    I like that input scheme, but it's tricky to simulate using PowerShell's Read-Host. But, this gets pretty close:
-    You enter a string of those characters in any order and duplicates of the character cancel each other out.
+Base 10 and 16 numbers are entered normally, leading zeros are ignored and there's not need for a prefix like 0x for hex.
+Base 2 however is a little weird. It basically copies the input scheme for BinaryBlitz - a game a friend of mine wrote.
+(https://gannebraemorr.wixsite.com/home, click Files to download Binary Blitz.exe)
+In that game, your fingers rest on the home row (asdfjkl;) and those characters toggle the corresponding bit.
+I like that input scheme, but it's tricky to simulate using PowerShell's Read-Host. But, this gets pretty close:
+You enter a string of those characters in any order and duplicates of the character cancel each other out.
 
-    For example, all of these evaluate to 1001 0000 (144) since the first (a) and fourth (f) bit are entered.
-    af
-    fa
-    afaa (the extra two a's cancel each other)
+For example, all of these evaluate to 1001 0000 (144) since the first (a) and fourth (f) bit are entered.
+af
+fa
+afaa (the extra two a's cancel each other)
 #>
 
 $binColor = [System.ConsoleColor]::Magenta
